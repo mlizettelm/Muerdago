@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import filedialog
 import cv2 as cv
 import numpy as np
-#from tkinter import filedialog
 import matplotlib.pyplot as plt
 
 #Binarización
