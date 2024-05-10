@@ -1,0 +1,7 @@
+path: /Users/lizette/MCC_coding/Muerdago/yolov8/data  #dataset root dir
+train: images/train # train images (relative 'path')
+val: images/train # val images (relative 'path')
+
+#classes
+names: 
+  0: estoma

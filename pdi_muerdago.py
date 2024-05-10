@@ -5,6 +5,9 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
+#import math
+import torch
+
 
 
 # Definir la variable global para el archivo seleccionado
@@ -158,12 +161,10 @@ def binarizacion():
     
     
     # Apply adaptive thresholding with ADAPTIVE_THRESH_MEAN_C uses the mean of the neighborhood area
-    adaptive_mean_b = cv.adaptiveThreshold(imagen_GRAY2, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 13, 6)
+    adaptive_mean_b = cv.adaptiveThreshold(imagen_GRAY2, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 6)
     # Apply adaptive thresholding with ADAPTIVE_THRESH_GAUSSIAN_C uses the mean of the neighborhood area
-    adaptive_gaussian_b = cv.adaptiveThreshold(imagen_GRAY2, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 13, 6)
+    adaptive_gaussian_b = cv.adaptiveThreshold(imagen_GRAY2, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 6)
 
-    
-    
     
     fig, axs = plt.subplots(2,3,figsize = (10,10))
     
@@ -187,6 +188,12 @@ def binarizacion():
     plt.tight_layout()
     plt.show()
    
+    based_image_name = os.path.basename(ruta_archivo)
+    bin_image_file = '/Users/lizette/MCC_coding/Muerdago/img/binarias/b_' + based_image_name
+    
+    #Paso 8: Guardar la imagen
+    cv.imwrite(bin_image_file, adaptive_gaussian_b)
+    print(f'Imagen corregida guardada en: {bin_image_file}')
 
 #Corrección de imagen
 def correcciones():
@@ -197,19 +204,53 @@ def correcciones():
     image = cv.imread(ruta_archivo)
 
     # Paso 2: Corrección de exposición y contraste
-    exposure_corrected = cv.convertScaleAbs(image, alpha=1.2, beta=10)
+    #exposure_corrected = cv.convertScaleAbs(image, alpha=1.2, beta=10)
+    exposure_corrected = cv.convertScaleAbs(image, alpha=1.8, beta=0)
+
 
     # Paso 3: Reducción de ruido
     noise_reduced = cv.fastNlMeansDenoisingColored(exposure_corrected, None, 10, 10, 7, 21)
 
-    # Paso 4: Ajuste de nitidez
+
+    # Paso 3.1: umbralización
+    # Aplicar thresholding
+    # Apply adaptive thresholding with ADAPTIVE_THRESH_GAUSSIAN_C uses the mean of the neighborhood area
+    
+    imagen_RGB = cv.cvtColor(noise_reduced,cv.COLOR_BGR2RGB)
+    #imagen_GRAY1 = cv.cvtColor(imagen_BGR,cv.COLOR_BGR2GRAY)
+    imagen_GRAY2 = cv.cvtColor(imagen_RGB,cv.COLOR_RGB2GRAY)
+    binary_image2 = cv.adaptiveThreshold(imagen_GRAY2, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 21, 2)
+
+    binary_image = cv.adaptiveThreshold(binary_image2, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 103, 2)
+
+
+
+    #Paso 4: Ajuste de nitidez
     sharpen_kernel = np.array([[-1, -1, -1],
                                 [-1, 9, -1],
                                 [-1, -1, -1]])
-    sharpened = cv.filter2D(noise_reduced, -1, sharpen_kernel)
+    
+    
+    
+    # sharpen_kernel = np.array([[-1, 0, 1],
+    #                             [0, 0, -0],
+    #                             [1, 0, -1]])
+    
+    #filtro para deteccion de bordes
+    
+    # sharpen_kernel = np.array([[-1, 0, 1],
+    #                             [-2, 0, 2],
+    #                             [-1, 0, 1]])
+    
+    
+    
+    #sharpened = cv.filter2D(noise_reduced, -1, sharpen_kernel)
+    sharpened = cv.filter2D(binary_image, -1, sharpen_kernel)
+
+    imagen_BGR = cv.cvtColor(sharpened,cv.COLOR_GRAY2BGR)
 
     # Paso 5: Corrección de color (ajuste de balance de blanco)
-    color_corrected = cv.cvtColor(sharpened, cv.COLOR_BGR2LAB)
+    color_corrected = cv.cvtColor(imagen_BGR, cv.COLOR_BGR2LAB)
     
     l_channel, a_channel, b_channel = cv.split(color_corrected)
     
@@ -218,12 +259,15 @@ def correcciones():
     
     color_corrected = cv.merge((l_channel, a_channel, b_channel))
     color_corrected = cv.cvtColor(color_corrected, cv.COLOR_LAB2BGR)
+    gray_color_corrected = cv.cvtColor(color_corrected,cv.COLOR_BGR2GRAY)
 
+    adaptive_gaussian_b = cv.adaptiveThreshold(gray_color_corrected, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 111, 3)
+    
     fig, axs = plt.subplots(1,2,figsize = (10,10))
     
     axs[0].imshow(image, cmap = "gray")
     axs[0].set_title("Imagen original")
-    axs[1].imshow(color_corrected,cmap = "gray")
+    axs[1].imshow(adaptive_gaussian_b,cmap = "gray")
     axs[1].set_title("Imagen corregida")
 
     
@@ -297,7 +341,6 @@ def contornos():
     ruta_archivo = archivo_seleccionado
     
     # Carga de la imagen
-    #image = cv.imread(ruta_archivo,cv.IMREAD_GRAYSCALE) # leemos la imagen en escala de grises
     image = cv.imread(ruta_archivo)
     
     # Convertir la imagen a escala de grises
@@ -308,7 +351,7 @@ def contornos():
 
     # Aplicar la umbralización para segmentar las células
     #_, thresholded_image = cv.threshold(image_blurred, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
-    #_, thresholded_image = cv.threshold(gray_image, 120, 255, cv.THRESH_BINARY)
+    _, thresholded_image = cv.threshold(gray_image, 120, 255, cv.THRESH_BINARY)
     
     # Encontrar contornos en la imagen umbralizada
     contours, _ = cv.findContours(thresholded_image, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
@@ -327,23 +370,6 @@ def contornos():
     for contour in contours:
         cv.drawContours(merged_contours, [contour], -1, (255, 255, 255), 2)
 
-    #cv.drawContours(image, contours, -1, (0, 255, 0), 2)
-
-    # Contar el número de células
-    #num_cells = len(filtered_contours)
-    #print("Número de células detectadas:", num_cells)
-
-    # Mostrar la imagen con los contornos de las células
-    #cv_imshow(image_with_contours)
-
-
-    #OJO: CHECAR QUE ES UN MAL ARGUMENTO PARA LA FUNCION IMSHOW...
-    # cv.imshow("Contornos:", image)
-    # cv.imshow("Procesada para contornos:",contours)
-    
-    # cv.waitKey(0)
-    # cv.destroyAllWindows()
-    
     # Crear una figura y ejes usando Matplotlib
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
 
@@ -358,7 +384,129 @@ def contornos():
     # Mostrar la figura
     plt.show()
    
+def canny():
+    global archivo_seleccionado
+    ruta_archivo = archivo_seleccionado
+    
+    # Carga de la imagen
+    image = cv.imread(ruta_archivo)
+    
+    # Convertir la imagen a escala de grises
+    gray_image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    
+    
+    # Aplicar la detección de bordes con Canny
+    edges = cv.Canny(gray_image, 50, 150, apertureSize=3)
 
+    # Aplicar la Transformada de Hough para detectar líneas
+    lines = cv.HoughLines(edges, 1, np.pi/180, 150)
+
+    # Dibujar las líneas detectadas sobre la imagen original
+    image_with_lines = cv.cvtColor(gray_image, cv.COLOR_GRAY2BGR)
+    
+    if lines is not None:
+        for rho, theta in lines[:, 0]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            x1 = int(x0 + 1000 * (-b))
+            y1 = int(y0 + 1000 * (a))
+            x2 = int(x0 - 1000 * (-b))
+            y2 = int(y0 - 1000 * (a))
+            cv.line(image_with_lines, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+    # Crear una figura y ejes usando Matplotlib
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Mostrar la imagen original en el primer eje
+    axs[0].imshow(cv.cvtColor(gray_image, cv.COLOR_BGR2RGB))
+    axs[0].set_title('Imagen Original')
+
+    # Mostrar la imagen con contornos en el segundo eje
+    axs[1].imshow(cv.cvtColor(image_with_lines, cv.COLOR_BGR2RGB))
+    axs[1].set_title('Imagen con Contornos')
+
+    # Mostrar la figura
+    plt.show()
+    
+    
+def GaussLaplace():
+    global archivo_seleccionado
+    ruta_archivo = archivo_seleccionado
+    
+    # Carga de la imagen
+    image = cv.imread(ruta_archivo)
+    
+    # Convertir la imagen a escala de grises
+    gray_image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    
+    
+    # Aplicar un filtro Gaussiano para suavizar la imagen
+    image_blurred = cv.GaussianBlur(gray_image, (3, 3), 0)
+
+    # Aplicar el operador Laplaciano
+    laplacian = cv.Laplacian(image_blurred, cv.CV_64F)
+
+    # Convertir el resultado a un rango de 0-255 (uint8)
+    laplacian = np.uint8(np.absolute(laplacian))
+
+    # Mostrar los bordes en la imagen original
+    image_with_edges = cv.cvtColor(gray_image, cv.COLOR_GRAY2BGR)
+    
+    image_with_edges[laplacian > 50] = [0, 0, 255]  # Pintar los bordes de rojo
+
+
+
+    # Crear una figura y ejes usando Matplotlib
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Mostrar la imagen original en el primer eje
+    axs[0].imshow(cv.cvtColor(image_blurred, cv.COLOR_BGR2RGB))
+    axs[0].set_title('Imagen Gaussian')
+
+    # Mostrar la imagen con contornos en el segundo eje
+    axs[1].imshow(cv.cvtColor(image_with_edges, cv.COLOR_BGR2RGB))
+    axs[1].set_title('Imagen Laplace')
+
+    # Mostrar la figura
+    plt.show()
+    
+
+def erosiondilatacion():
+    global archivo_seleccionado
+    ruta_archivo = archivo_seleccionado
+    
+    # Carga de la imagen
+    image = cv.imread(ruta_archivo)
+    
+    # Convertir la imagen a escala de grises
+    gray_image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    
+    # Definir el kernel para las operaciones morfológicas
+    kernel = np.ones((5,5), np.uint8)
+
+    # Aplicar erosión para suavizar los bordes
+    erosion = cv.erode(gray_image, kernel, iterations=1)
+
+    # Aplicar dilatación para resaltar los bordes
+    dilation = cv.dilate(gray_image, kernel, iterations=1)
+
+
+    # Crear una figura y ejes usando Matplotlib
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Mostrar la imagen original en el primer eje
+    axs[0].imshow(cv.cvtColor(erosion, cv.COLOR_BGR2RGB))
+    axs[0].set_title('Erosion')
+
+    # Mostrar la imagen con contornos en el segundo eje
+    axs[1].imshow(cv.cvtColor(dilation, cv.COLOR_BGR2RGB))
+    axs[1].set_title('Dilatacion')
+
+    # Mostrar la figura
+    plt.show()
+    
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #Ventana principal
@@ -388,7 +536,6 @@ buttonOpc0.grid(row=1,column=0,pady=8,sticky="e")
 buttonOpc0.config(cursor="hand2")
 buttonOpc0.config(bg="bisque")
 buttonOpc0.config(font=("Arial",12))
-buttonOpc0.config(cursor="hand2")
 
 label_archivo = tk.Label(frame01,text="")
 label_archivo.config(font=("Arial",12))
@@ -405,63 +552,54 @@ buttonOpc2.grid(row=2,column=0,pady=8,sticky="e")
 buttonOpc2.config(cursor="hand2")
 buttonOpc2.config(bg="bisque")
 buttonOpc2.config(font=("Arial",12))
-buttonOpc2.config(cursor="hand2")
 
 buttonOpc3 = tk.Button (frame01,text="Separación de Canales", command=separacioncanales)
 buttonOpc3.grid(row=3,column=0,pady=8,sticky="e")
 buttonOpc3.config(cursor="hand2")
 buttonOpc3.config(bg="bisque")
 buttonOpc3.config(font=("Arial",12))
-buttonOpc3.config(cursor="hand2")
 
 buttonOpc4 = tk.Button (frame01,text="Binarización", command=binarizacion)
 buttonOpc4.grid(row=4,column=0,pady=8,sticky="e")
 buttonOpc4.config(cursor="hand2")
 buttonOpc4.config(bg="bisque")
 buttonOpc4.config(font=("Arial",12))
-buttonOpc4.config(cursor="hand2")
-
 
 buttonOpc5 = tk.Button(frame01,text="Correcciones", command=correcciones)
 buttonOpc5.grid(row=5,column=0,pady=8,sticky="e")
 buttonOpc5.config(cursor="hand2")
 buttonOpc5.config(bg="bisque")
 buttonOpc5.config(font=("Arial",12))
-buttonOpc5.config(cursor="hand2")
 
 buttonOpc6 = tk.Button (frame01,text="Filtro Sobel", command=sobel)
 buttonOpc6.grid(row=6,column=0,pady=8,sticky="e")
 buttonOpc6.config(cursor="hand2")
 buttonOpc6.config(bg="bisque")
 buttonOpc6.config(font=("Arial",12))
-buttonOpc6.config(cursor="hand2")
 
-buttonOpc7 = tk.Button (frame01,text="Conteo", command=contornos)
+buttonOpc7 = tk.Button (frame01,text="Contornos", command=contornos)
 buttonOpc7.grid(row=7,column=0,pady=8,sticky="e")
 buttonOpc7.config(cursor="hand2")
 buttonOpc7.config(bg="bisque")
 buttonOpc7.config(font=("Arial",12))
-buttonOpc7.config(cursor="hand2")
 
-# buttonOpc6 = Button (frame01,text="Operaciones Morfologicas", command=morfologicas)
-# buttonOpc6.grid(row=6,column=0,pady=8,sticky="e")
-# buttonOpc6.config(cursor="hand2")
-# buttonOpc6.config(bg="bisque")
-# buttonOpc6.config(font=("Arial",12))
-# buttonOpc6.config(cursor="hand2")
+buttonOpc8 = tk.Button (frame01,text="Contornos Canny", command=canny)
+buttonOpc8.grid(row=8,column=0,pady=8,sticky="e")
+buttonOpc8.config(cursor="hand2")
+buttonOpc8.config(bg="bisque")
+buttonOpc8.config(font=("Arial",12))
 
-# buttonOpc7 = Button (frame01,text="Segmentación K-means", command=segmentacion)
-# buttonOpc7.grid(row=7,column=0,pady=8,sticky="e")
-# buttonOpc7.config(cursor="hand2")
-# buttonOpc7.config(bg="bisque")
-# buttonOpc7.config(font=("Arial",12))
-# buttonOpc7.config(cursor="hand2")
+buttonOpc9 = tk.Button (frame01,text="Gauss and Laplace", command=GaussLaplace)
+buttonOpc9.grid(row=9,column=0,pady=8,sticky="e")
+buttonOpc9.config(cursor="hand2")
+buttonOpc9.config(bg="bisque")
+buttonOpc9.config(font=("Arial",12))
 
-# buttonOpc8 = Button (frame01,text="Algoritmo Felzenszwalb", command=algoritmoFelzen)
-# buttonOpc8.grid(row=8,column=0,pady=8,sticky="e")
-# buttonOpc8.config(cursor="hand2")
-# buttonOpc8.config(bg="bisque")
-# buttonOpc8.config(font=("Arial",12))
-# buttonOpc8.config(cursor="hand2")
+
+buttonOpc8 = tk.Button (frame01,text="Erosion / Dilatacion", command=erosiondilatacion)
+buttonOpc8.grid(row=10,column=0,pady=8,sticky="e")
+buttonOpc8.config(cursor="hand2")
+buttonOpc8.config(bg="bisque")
+buttonOpc8.config(font=("Arial",12))
 
 root.mainloop() #ciclo principal para que aparezca el root o pantalla principal
